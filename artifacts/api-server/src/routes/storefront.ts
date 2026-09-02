@@ -15,8 +15,11 @@ import { catalog, findProduct, findProductByTag, storeStatus } from "../data/cat
 
 const router: IRouter = Router();
 
-function quoteItems(items: Array<{ productId: string; quantity: number }>) {
+function quoteItems(
+  items: Array<{ productId?: string; quantity?: number }>,
+) {
   return items.flatMap((item) => {
+    if (!item.productId || item.quantity === undefined) return [];
     const product = findProduct(item.productId);
     if (!product) return [];
     return [

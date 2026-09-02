@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "framework": "vite",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @workspace/armani-duty-free run build",
+  "outputDirectory": "artifacts/armani-duty-free/dist/public",
+  "rewrites": [
+    {
+      "source": "/checkout",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/order/:id",
+      "destination": "/index.html"
+    }
+  ]
+}
