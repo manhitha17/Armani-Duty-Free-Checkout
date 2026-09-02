@@ -1,6 +1,6 @@
-# [Project name]
+# Armani Duty Free
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An elevated airport duty-free storefront with RFID-assisted self-checkout, travel eligibility, and collection reservations.
 
 ## Run & Operate
 
@@ -22,23 +22,32 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/armani-duty-free/src/App.tsx` — customer storefront, basket, checkout, and reservation routes
+- `artifacts/armani-duty-free/src/index.css` — Armani Duty Free visual language and responsive styles
+- `artifacts/api-server/src/data/catalog.ts` — catalog, RFID tags, and store context
+- `artifacts/api-server/src/routes/storefront.ts` — catalog, quote, RFID, checkout, and status APIs
+- `artifacts/api-server/src/routes/graphql.ts` — lightweight GraphQL storefront query endpoint
+- `lib/api-spec/openapi.yaml` — source of truth for generated REST hooks and schemas
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The storefront is a deployable React/Vite artifact at `/`; the shared API server owns `/api` routes.
+- Basket state is persisted locally for a fast airport-terminal flow; checkout returns a reservation for gate collection.
+- RFID supports Web Serial readers when available and manual tag entry as a browser-safe fallback.
+- GraphQL is exposed at `/api/graphql` for catalog and store-status queries alongside the generated REST surface.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Customers can browse a curated Armani catalog, search and filter by category, build a basket, see duty-free savings, add items by RFID tag, provide destination and flight details, and reserve a completed order for collection after security.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Build the experience as a complete hostable website for an Armani duty-free self-checkout store.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Keep Terminal 3 copy aligned with the live store status returned by the API.
+- Regenerate API hooks after changing `lib/api-spec/openapi.yaml`.
 
 ## Pointers
 

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Armani Duty Free"
+description = "A premium duty-free storefront with RFID-enabled self-checkout, GraphQL-backed catalog and cart operations, and a welcoming airport retail experience for international travelers."
+version = "1.0.0"
+id = "artifacts/armani-duty-free"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22024
+
+[services.development]
+run = "pnpm --filter @workspace/armani-duty-free run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/armani-duty-free", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/armani-duty-free/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22024"
+BASE_PATH = "/"

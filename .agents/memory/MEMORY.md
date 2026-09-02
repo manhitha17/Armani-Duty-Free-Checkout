@@ -1,0 +1,1 @@
+- [OpenAPI and validator compatibility](openapi-validator-compatibility.md) — the generated Zod target is older than the OpenAPI generator defaults for integer/email formats.

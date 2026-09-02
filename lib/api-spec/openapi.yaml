@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Armani Duty Free storefront and self-checkout API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: catalog
+    description: Duty-free product catalog
+  - name: checkout
+    description: Self-checkout and RFID operations
+  - name: store
+    description: Store availability and travel context
 paths:
   /healthz:
     get:
@@ -24,6 +30,129 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /catalog:
+    get:
+      operationId: listCatalog
+      tags: [catalog]
+      summary: List products
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Products matching the filters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+  /catalog/featured:
+    get:
+      operationId: getFeaturedProducts
+      tags: [catalog]
+      summary: Get featured products
+      responses:
+        "200":
+          description: Featured products for the storefront
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+  /cart/quote:
+    post:
+      operationId: quoteCart
+      tags: [checkout]
+      summary: Calculate a duty-free basket quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartQuoteInput"
+      responses:
+        "200":
+          description: Basket totals and travel eligibility
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartQuote"
+  /rfid/scan:
+    post:
+      operationId: scanRfid
+      tags: [checkout]
+      summary: Resolve an RFID tag into a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RfidScanInput"
+      responses:
+        "200":
+          description: RFID scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RfidScanResult"
+  /checkout:
+    post:
+      operationId: completeCheckout
+      tags: [checkout]
+      summary: Complete a self-checkout purchase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "200":
+          description: Completed order and collection instructions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResult"
+  /store/status:
+    get:
+      operationId: getStoreStatus
+      tags: [store]
+      summary: Get store status and travel context
+      responses:
+        "200":
+          description: Current store status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreStatus"
+  /graphql:
+    post:
+      operationId: graphqlRequest
+      tags: [catalog]
+      summary: Query the storefront GraphQL API
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphqlInput"
+      responses:
+        "200":
+          description: GraphQL response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphqlResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +162,121 @@ components:
           type: string
       required:
         - status
+    Product:
+      type: object
+      required: [id, name, brand, category, price, compareAtPrice, image, description, size, badge, rfidTag]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        brand: { type: string }
+        category: { type: string }
+        price: { type: number }
+        compareAtPrice: { type: number }
+        image: { type: string }
+        description: { type: string }
+        size: { type: string }
+        badge: { type: string }
+        rfidTag: { type: string }
+    CartLineInput:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string }
+        quantity: { type: number, minimum: 1 }
+    CartQuoteInput:
+      type: object
+      required: [items, destination, flightTime]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CartLineInput" }
+        destination: { type: string }
+        flightTime: { type: string }
+    CartLine:
+      type: object
+      required: [product, quantity, lineTotal]
+      properties:
+        product: { $ref: "#/components/schemas/Product" }
+        quantity: { type: number }
+        lineTotal: { type: number }
+    CartQuote:
+      type: object
+      required: [items, subtotal, savings, duties, total, itemCount, eligible, message]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CartLine" }
+        subtotal: { type: number }
+        savings: { type: number }
+        duties: { type: number }
+        total: { type: number }
+        itemCount: { type: number }
+        eligible: { type: boolean }
+        message: { type: string }
+    RfidScanInput:
+      type: object
+      required: [tagId]
+      properties:
+        tagId: { type: string }
+        device: { type: string }
+    RfidScanResult:
+      type: object
+      required: [tagId, found, product, message]
+      properties:
+        tagId: { type: string }
+        found: { type: boolean }
+        product:
+          anyOf:
+            - $ref: "#/components/schemas/Product"
+            - type: "null"
+        message: { type: string }
+    CheckoutInput:
+      type: object
+      required: [items, destination, flightNumber, email, paymentMethod]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CartLineInput" }
+        destination: { type: string }
+        flightNumber: { type: string }
+        email: { type: string }
+        paymentMethod: { type: string }
+    CheckoutResult:
+      type: object
+      required: [orderId, total, collectionPoint, collectionWindow, message]
+      properties:
+        orderId: { type: string }
+        total: { type: number }
+        collectionPoint: { type: string }
+        collectionWindow: { type: string }
+        message: { type: string }
+    StoreStatus:
+      type: object
+      required: [open, location, terminal, collectionPoint, nextFlight]
+      properties:
+        open: { type: boolean }
+        location: { type: string }
+        terminal: { type: string }
+        collectionPoint: { type: string }
+        nextFlight: { type: string }
+    GraphqlInput:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string }
+        variables:
+          type: object
+          additionalProperties: true
+    GraphqlResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
 
