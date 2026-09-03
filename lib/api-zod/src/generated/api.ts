@@ -75,6 +75,12 @@ export const QuoteCartBody = zod.object({
   "flightTime": zod.string()
 })
 
+export const quoteCartResponseStoreCreditCentsMin = 0;
+
+export const quoteCartResponseCreditAppliedCentsMin = 0;
+
+
+
 export const QuoteCartResponse = zod.object({
   "items": zod.array(zod.object({
   "product": zod.object({
@@ -99,6 +105,8 @@ export const QuoteCartResponse = zod.object({
   "total": zod.number(),
   "itemCount": zod.number(),
   "eligible": zod.boolean(),
+  "storeCreditCents": zod.number().min(quoteCartResponseStoreCreditCentsMin).describe('Whole cents available to the signed-in customer'),
+  "creditAppliedCents": zod.number().min(quoteCartResponseCreditAppliedCentsMin).describe('Whole cents applied to this quote'),
   "message": zod.string()
 })
 
@@ -166,6 +174,19 @@ export const GetStoreStatusResponse = zod.object({
   "terminal": zod.string(),
   "collectionPoint": zod.string(),
   "nextFlight": zod.string()
+})
+
+
+/**
+ * @summary Get the signed-in customer's account
+ */
+export const getCustomerAccountResponseStoreCreditCentsMin = 0;
+
+
+
+export const GetCustomerAccountResponse = zod.object({
+  "userId": zod.string(),
+  "storeCreditCents": zod.number().min(getCustomerAccountResponseStoreCreditCentsMin).describe('Whole cents')
 })
 
 

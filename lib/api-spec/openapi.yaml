@@ -16,6 +16,8 @@ tags:
     description: Self-checkout and RFID operations
   - name: store
     description: Store availability and travel context
+  - name: account
+    description: Authenticated customer account
 paths:
   /healthz:
     get:
@@ -74,6 +76,8 @@ paths:
       operationId: quoteCart
       tags: [checkout]
       summary: Calculate a duty-free basket quote
+      security:
+        - ClerkSession: []
       requestBody:
         required: true
         content:
@@ -87,11 +91,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CartQuote"
+        "401":
+          description: Authentication required
   /rfid/scan:
     post:
       operationId: scanRfid
       tags: [checkout]
       summary: Resolve an RFID tag into a product
+      security:
+        - ClerkSession: []
       requestBody:
         required: true
         content:
@@ -105,11 +113,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RfidScanResult"
+        "401":
+          description: Authentication required
   /checkout:
     post:
       operationId: completeCheckout
       tags: [checkout]
       summary: Complete a self-checkout purchase
+      security:
+        - ClerkSession: []
       requestBody:
         required: true
         content:
@@ -123,6 +135,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CheckoutResult"
+        "401":
+          description: Authentication required
+        "409":
+          description: Store credit changed while completing checkout
   /store/status:
     get:
       operationId: getStoreStatus
@@ -135,6 +151,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StoreStatus"
+  /account:
+    get:
+      operationId: getCustomerAccount
+      tags: [account]
+      summary: Get the signed-in customer's account
+      security:
+        - ClerkSession: []
+      responses:
+        "200":
+          description: Authenticated customer account and store credit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerAccount"
+        "401":
+          description: Authentication required
   /graphql:
     post:
       operationId: graphqlRequest
@@ -154,6 +186,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/GraphqlResponse"
 components:
+  securitySchemes:
+    ClerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
   schemas:
     HealthStatus:
       type: object
@@ -201,7 +238,7 @@ components:
         lineTotal: { type: number }
     CartQuote:
       type: object
-      required: [items, subtotal, savings, duties, total, itemCount, eligible, message]
+      required: [items, subtotal, savings, duties, total, itemCount, eligible, storeCreditCents, creditAppliedCents, message]
       properties:
         items:
           type: array
@@ -212,6 +249,8 @@ components:
         total: { type: number }
         itemCount: { type: number }
         eligible: { type: boolean }
+        storeCreditCents: { type: number, minimum: 0, description: Whole cents available to the signed-in customer }
+        creditAppliedCents: { type: number, minimum: 0, description: Whole cents applied to this quote }
         message: { type: string }
     RfidScanInput:
       type: object
@@ -259,6 +298,12 @@ components:
         terminal: { type: string }
         collectionPoint: { type: string }
         nextFlight: { type: string }
+    CustomerAccount:
+      type: object
+      required: [userId, storeCreditCents]
+      properties:
+        userId: { type: string }
+        storeCreditCents: { type: number, minimum: 0, description: Whole cents }
     GraphqlInput:
       type: object
       required: [query]

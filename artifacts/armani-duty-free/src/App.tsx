@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ClerkProvider, Show, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { shadcn } from '@clerk/themes';
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +26,7 @@ import {
 } from 'lucide-react';
 import {
   getGetFeaturedProductsQueryKey,
+  getGetCustomerAccountQueryKey,
   getGetStoreStatusQueryKey,
   getListCatalogQueryKey,
   type CartLineInput,
@@ -31,6 +35,7 @@ import {
   type Product,
   useCompleteCheckout,
   useGetFeaturedProducts,
+  useGetCustomerAccount,
   useGetStoreStatus,
   useListCatalog,
   useQuoteCart,
@@ -38,10 +43,66 @@ import {
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, useLocation, useParams, Router as WouterRouter, Link } from 'wouter';
+import { Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter, Link } from 'wouter';
 
 const queryClient = new QueryClient();
 const money = (value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+function stripBase(path: string) {
+  return basePath && path.startsWith(basePath) ? path.slice(basePath.length) || '/' : path;
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: 'clerk',
+  options: {
+    logoPlacement: 'inside' as const,
+    logoLinkUrl: basePath || '/',
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: '#123d3a',
+    colorForeground: '#183331',
+    colorMutedForeground: '#6f7d78',
+    colorDanger: '#a63f35',
+    colorBackground: '#f6f3ec',
+    colorInput: '#fbfaf7',
+    colorInputForeground: '#183331',
+    colorNeutral: '#d7ddd6',
+    fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+    borderRadius: '0px',
+  },
+  elements: {
+    rootBox: 'w-full flex justify-center',
+    cardBox: 'bg-[#f6f3ec] rounded-none w-[440px] max-w-full overflow-hidden border border-[#d7ddd6]',
+    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    headerTitle: 'text-[#183331] font-semibold',
+    headerSubtitle: 'text-[#6f7d78]',
+    socialButtonsBlockButtonText: 'text-[#183331] font-semibold',
+    formFieldLabel: 'text-[#183331] font-semibold',
+    footerActionLink: 'text-[#123d3a] font-semibold',
+    footerActionText: 'text-[#6f7d78]',
+    dividerText: 'text-[#6f7d78]',
+    identityPreviewEditButton: 'text-[#123d3a]',
+    formFieldSuccessText: 'text-[#2f6d57]',
+    alertText: 'text-[#a63f35]',
+    logoBox: 'h-12',
+    logoImage: 'max-h-12',
+    socialButtonsBlockButton: 'border-[#d7ddd6] bg-[#fbfaf7] hover:bg-white',
+    formButtonPrimary: 'bg-[#123d3a] text-[#f6f3ec] hover:bg-[#1c5751]',
+    formFieldInput: 'border-[#d7ddd6] bg-[#fbfaf7] text-[#183331]',
+    footerAction: 'border-t border-[#d7ddd6]',
+    dividerLine: 'bg-[#d7ddd6]',
+    alert: 'border-[#d7ddd6] bg-[#f1e5da]',
+    otpCodeFieldInput: 'border-[#d7ddd6] bg-[#fbfaf7]',
+    formFieldRow: 'gap-2',
+    main: 'bg-transparent',
+  },
+};
 
 type BasketLine = { product: Product; quantity: number };
 
@@ -59,6 +120,32 @@ function usePersistedBasket() {
   const adjust = (id: string, change: number) => setBasket((current) => current.map((line) => line.product.id === id ? { ...line, quantity: Math.max(1, line.quantity + change) } : line));
   const clear = () => setBasket([]);
   return { basket, add, remove, adjust, clear };
+}
+
+function AccountControl() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  if (!isLoaded) return <span className="hidden text-[10px] font-bold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))] sm:inline">Loading account</span>;
+  if (isSignedIn) {
+    const name = user?.firstName || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Account';
+    return <div className="flex items-center gap-3">
+      <Link href="/account" className="hidden text-right sm:block" data-testid="link-account">
+        <span className="mono-label block text-[hsl(var(--muted-foreground))]">Signed in as</span>
+        <span className="mt-1 block max-w-[130px] truncate text-xs font-bold">{name}</span>
+      </Link>
+      <button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} className="hidden border border-[hsl(var(--border))] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.12em] md:block" data-testid="button-sign-out">Sign out</button>
+    </div>;
+  }
+  return <div className="hidden items-center gap-3 sm:flex">
+    <Link href="/sign-in" className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]" data-testid="link-sign-in">Sign in</Link>
+    <Link href="/sign-up" className="border border-[hsl(var(--primary))] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--primary))]" data-testid="link-register">Create account</Link>
+  </div>;
+}
+
+function MobileSignOut() {
+  const { signOut } = useClerk();
+  return <button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} className="text-left text-[hsl(var(--muted-foreground))]" data-testid="button-mobile-sign-out">Sign out</button>;
 }
 
 function Header({ count, onBasket }: { count: number; onBasket: () => void }) {
@@ -85,6 +172,7 @@ function Header({ count, onBasket }: { count: number; onBasket: () => void }) {
             <Link href="/#beauty" className="text-xs font-bold uppercase tracking-[0.16em] text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--foreground))]" data-testid="link-beauty">Beauty</Link>
           </nav>
           <div className="flex items-center gap-2">
+            <AccountControl />
             <button onClick={onBasket} className="relative flex h-11 items-center gap-2 border border-[hsl(var(--primary))] bg-[hsl(var(--primary))] px-4 text-xs font-bold uppercase tracking-[0.12em] text-[hsl(var(--background))] transition-transform hover:-translate-y-0.5" data-testid="button-open-basket">
               <ShoppingBag size={16} strokeWidth={1.7} /><span className="hidden sm:inline">Basket</span>
               <span className="flex h-5 min-w-5 items-center justify-center bg-[hsl(var(--secondary))] px-1 text-[10px] text-[hsl(var(--primary))]" data-testid="text-basket-count">{count}</span>
@@ -93,7 +181,9 @@ function Header({ count, onBasket }: { count: number; onBasket: () => void }) {
           </div>
         </div>
         {menuOpen && <div className="border-t border-[hsl(var(--border))] px-5 py-4 md:hidden">
-          <div className="flex flex-col gap-4 text-xs font-bold uppercase tracking-[0.16em]">
+           <div className="flex flex-col gap-4 text-xs font-bold uppercase tracking-[0.16em]">
+             <Show when="signed-in"><Link href="/account" onClick={() => setMenuOpen(false)} data-testid="link-mobile-account">My account</Link><MobileSignOut /></Show>
+             <Show when="signed-out"><Link href="/sign-in" onClick={() => setMenuOpen(false)} data-testid="link-mobile-sign-in">Sign in</Link><Link href="/sign-up" onClick={() => setMenuOpen(false)} data-testid="link-mobile-register">Create account</Link></Show>
             <Link href="/#catalog" onClick={() => setMenuOpen(false)} data-testid="link-mobile-shop">Shop all</Link>
             <Link href="/#fragrance" onClick={() => setMenuOpen(false)} data-testid="link-mobile-fragrance">Fragrance</Link>
             <Link href="/#beauty" onClick={() => setMenuOpen(false)} data-testid="link-mobile-beauty">Beauty</Link>
@@ -232,8 +322,38 @@ function Footer() {
    return <footer className="border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/.55)]"><div className="mx-auto flex max-w-[1440px] flex-col justify-between gap-8 px-5 py-10 sm:px-10 lg:flex-row lg:items-end lg:px-16"><div><div className="mb-4 flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center border border-[hsl(var(--primary))] font-serif italic">A</span><span className="text-[11px] font-extrabold uppercase tracking-[0.22em]">Armani Duty Free</span></div><p className="max-w-xs text-xs leading-6 text-[hsl(var(--muted-foreground))]">A quieter way to shop between here and there.</p></div><div className="text-left lg:text-right"><p className="mono-label text-[hsl(var(--muted-foreground))]">Need a hand?</p><p className="mt-2 text-sm font-bold">Find a beauty advisor in Terminal 3</p></div></div></footer>;
 }
 
+function AuthRequiredPage({ title = 'Your journey starts with an account.' }: { title?: string }) {
+  return <div className="armani-shell min-h-[100dvh]"><Header count={0} onBasket={() => undefined} /><main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-5 text-center"><div className="mb-6 flex h-20 w-20 items-center justify-center bg-[hsl(var(--secondary))] text-[hsl(var(--primary))]"><ShieldCheck size={30} strokeWidth={1.3} /></div><p className="mono-label text-[hsl(var(--accent-foreground))]">A private collection service</p><h1 className="display-serif mt-3 text-5xl italic">{title}</h1><p className="mt-4 max-w-md text-sm leading-7 text-[hsl(var(--muted-foreground))]">Create an account or sign in with your verified email to protect your reservations and any store credit linked to you.</p><div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/sign-in" className="bg-[hsl(var(--primary))] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[hsl(var(--background))]" data-testid="link-required-sign-in">Sign in</Link><Link href="/sign-up" className="border border-[hsl(var(--primary))] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em]" data-testid="link-required-sign-up">Create account</Link></div></main></div>;
+}
+
+function SignInPage() {
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] px-4 py-10"><div className="w-full max-w-[510px]"><div className="mb-7 text-center"><Link href="/" className="inline-flex items-center gap-3" data-testid="link-auth-home"><span className="flex h-10 w-10 items-center justify-center border border-[hsl(var(--primary))] font-serif text-xl italic text-[hsl(var(--primary))]">A</span><span className="text-left"><span className="block text-[11px] font-extrabold uppercase tracking-[0.25em] text-[hsl(var(--primary))]">Armani</span><span className="mono-label mt-1 block">Duty Free</span></span></Link></div><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} fallbackRedirectUrl={`${basePath}/checkout`} /></div></div>;
+}
+
+function SignUpPage() {
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] px-4 py-10"><div className="w-full max-w-[510px]"><div className="mb-7 text-center"><Link href="/" className="inline-flex items-center gap-3" data-testid="link-auth-home"><span className="flex h-10 w-10 items-center justify-center border border-[hsl(var(--primary))] font-serif text-xl italic text-[hsl(var(--primary))]">A</span><span className="text-left"><span className="block text-[11px] font-extrabold uppercase tracking-[0.25em] text-[hsl(var(--primary))]">Armani</span><span className="mono-label mt-1 block">Duty Free</span></span></Link></div><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} fallbackRedirectUrl={`${basePath}/checkout`} /></div></div>;
+}
+
+function AccountPage() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const { data: account, isLoading, isError } = useGetCustomerAccount({
+    query: {
+      queryKey: getGetCustomerAccountQueryKey(),
+      enabled: isLoaded && isSignedIn === true,
+    },
+  });
+  const [, setLocation] = useLocation();
+  if (!isLoaded) return <div className="armani-shell flex min-h-[100dvh] items-center justify-center"><p className="mono-label">Loading your account…</p></div>;
+  if (!isSignedIn) return <AuthRequiredPage title="Sign in to view your account." />;
+  const email = user?.primaryEmailAddress?.emailAddress ?? 'Verified email';
+  return <div className="armani-shell min-h-[100dvh]"><Header count={0} onBasket={() => setLocation('/')} /><main className="mx-auto max-w-5xl px-5 py-12 sm:px-10 lg:px-16 lg:py-20"><div className="mb-12 border-b border-[hsl(var(--border))] pb-8"><p className="mono-label text-[hsl(var(--accent-foreground))]">Your Armani profile</p><h1 className="mt-3 text-5xl font-medium tracking-[-.06em] sm:text-7xl">Welcome,<br /><span className="display-serif italic">{user?.firstName || 'traveller'}.</span></h1><p className="mt-5 max-w-xl text-sm leading-7 text-[hsl(var(--muted-foreground))]">This verified account is the only key to reservations and store credit. No customer ID is accepted from the browser.</p></div><div className="grid gap-5 md:grid-cols-2"><section className="border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8"><p className="mono-label text-[hsl(var(--muted-foreground))]">Identity verified by Clerk</p><h2 className="mt-3 text-2xl font-bold">{user?.fullName || 'Armani customer'}</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{email}</p><div className="mt-7 flex items-center gap-2 text-xs font-semibold text-[hsl(var(--secondary-foreground))]"><ShieldCheck size={16} /> Verified sign-in session</div></section><section className="border border-[hsl(var(--primary))] bg-[hsl(var(--primary))] p-6 text-[hsl(var(--background))] sm:p-8"><p className="mono-label text-[hsl(var(--secondary))]">Your store credit</p>{isLoading ? <div className="mt-4 h-10 w-32 animate-pulse bg-[hsl(var(--background)/.15)]" /> : isError ? <p className="mt-4 text-sm text-[hsl(var(--background)/.7)]">Credit balance unavailable. Please refresh before checkout.</p> : <><p className="mt-3 text-5xl font-medium tracking-[-.06em]" data-testid="text-store-credit">{money((account?.storeCreditCents ?? 0) / 100)}</p><p className="mt-3 text-sm leading-6 text-[hsl(var(--background)/.7)]">Applied automatically at checkout and deducted only from this verified account.</p></>}</section></div><div className="mt-8 flex flex-wrap gap-3"><Link href="/" className="bg-[hsl(var(--primary))] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[hsl(var(--background))]" data-testid="link-account-shop">Continue shopping <ArrowRight className="ml-2 inline" size={14} /></Link><Link href="/checkout" className="border border-[hsl(var(--primary))] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em]" data-testid="link-account-checkout">Go to checkout</Link></div></main></div>;
+}
+
 function CheckoutPage({ basket, onAdd, onRemove, onClear }: { basket: BasketLine[]; onAdd: (product: Product) => void; onRemove: (id: string) => void; onClear: () => void }) {
   const [, setLocation] = useLocation();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
   const [destination, setDestination] = useState('Japan');
   const [flightTime, setFlightTime] = useState('Today, 18:45');
   const [flightNumber, setFlightNumber] = useState('');
@@ -248,10 +368,20 @@ function CheckoutPage({ basket, onAdd, onRemove, onClear }: { basket: BasketLine
   const quoteMutation = useQuoteCart();
   const scanMutation = useScanRfid();
   const checkoutMutation = useCompleteCheckout();
+  const { data: account } = useGetCustomerAccount({
+    query: {
+      queryKey: getGetCustomerAccountQueryKey(),
+      enabled: isLoaded && isSignedIn === true,
+    },
+  });
   const items: CartLineInput[] = useMemo(() => basket.map((line) => ({ productId: line.product.id, quantity: line.quantity })), [basket]);
   const quote = quoteMutation.data as CartQuote | undefined;
-  const refreshQuote = () => { if (items.length) quoteMutation.mutate({ data: { items, destination, flightTime } }); };
-  useEffect(() => { if (items.length) refreshQuote(); }, [destination, flightTime, items]);
+  const refreshQuote = () => { if (items.length && isSignedIn) quoteMutation.mutate({ data: { items, destination, flightTime } }); };
+  useEffect(() => { if (items.length && isSignedIn) refreshQuote(); }, [destination, flightTime, items, isSignedIn]);
+  useEffect(() => {
+    const verifiedEmail = user?.primaryEmailAddress?.emailAddress;
+    if (verifiedEmail && !email) setEmail(verifiedEmail);
+  }, [user, email]);
   useEffect(() => { if (quote?.eligible) setStep(email && flightNumber ? 3 : 2); }, [quote, email, flightNumber]);
   const scanTag = (value: string) => { const normalizedTag = value.trim(); if (!normalizedTag) return; setScanMessage(''); scanMutation.mutate({ data: { tagId: normalizedTag, device: readerConnected ? 'web-serial-reader' : 'self-checkout-01' } }, { onSuccess: (result) => { setScannedTag(result.tagId); setScanMessage(result.message); if (result.found && result.product) { const already = basket.some((line) => line.product.id === result.product?.id); if (!already) onAdd(result.product); } setTagId(''); }, onError: () => setScanMessage('We could not read that tag. Check the code and try once more.') }); };
   const scan = (event: FormEvent) => { event.preventDefault(); scanTag(tagId); };
@@ -287,12 +417,14 @@ function CheckoutPage({ basket, onAdd, onRemove, onClear }: { basket: BasketLine
   };
   const complete = (event: FormEvent) => { event.preventDefault(); if (!items.length || !quote?.eligible) return; checkoutMutation.mutate({ data: { items, destination, flightNumber, email, paymentMethod } }, { onSuccess: (result) => { localStorage.setItem('armani-last-order', JSON.stringify(result)); onClear(); setLocation(`/order/${result.orderId}`); } }); };
   if (!basket.length) return <div className="armani-shell min-h-[100dvh]"><Header count={0} onBasket={() => setLocation('/')} /><main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-5 text-center"><div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--muted))]"><ShoppingBag size={30} strokeWidth={1.2} /></div><p className="mono-label text-[hsl(var(--muted-foreground))]">Self-checkout</p><h1 className="display-serif mt-3 text-5xl italic">Your basket is light.</h1><p className="mt-4 text-sm leading-7 text-[hsl(var(--muted-foreground))]">Choose something beautiful before you begin your departure details.</p><Link href="/#catalog" className="mt-8 bg-[hsl(var(--primary))] px-6 py-4 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[hsl(var(--background))]" data-testid="link-return-to-catalog">Return to collection</Link></main></div>;
+  if (!isLoaded) return <div className="armani-shell flex min-h-[100dvh] items-center justify-center"><p className="mono-label">Preparing secure checkout…</p></div>;
+  if (!isSignedIn) return <AuthRequiredPage title="Sign in before checkout." />;
   return <div className="armani-shell min-h-[100dvh]"><Header count={basket.reduce((sum, line) => sum + line.quantity, 0)} onBasket={() => setLocation('/')} /><main className="mx-auto max-w-[1440px] px-5 py-10 sm:px-10 lg:px-16 lg:py-16"><div className="mb-12 flex flex-col justify-between gap-8 border-b border-[hsl(var(--border))] pb-8 sm:flex-row sm:items-end"><div><Link href="/" className="mb-6 inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.15em] text-[hsl(var(--muted-foreground))]" data-testid="link-back-store"><ArrowLeft size={14} /> Back to store</Link><p className="mono-label text-[hsl(var(--accent-foreground))]">Self-checkout / Terminal 3</p><h1 className="mt-3 text-5xl font-medium tracking-[-.06em] sm:text-7xl">Ready when<br /><span className="display-serif italic">you are.</span></h1></div><div className="flex items-center gap-2 sm:pb-2">{['Basket', 'Travel', 'Confirm'].map((label, index) => <div key={label} className="flex items-center gap-2"><span className={`flex h-7 w-7 items-center justify-center text-[10px] font-bold ${step > index ? 'bg-[hsl(var(--secondary))]' : step === index + 1 ? 'bg-[hsl(var(--primary))] text-[hsl(var(--background))]' : 'border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]'}`}>{step > index ? <Check size={13} /> : index + 1}</span><span className={`hidden text-[10px] font-bold uppercase tracking-[0.14em] sm:inline ${step === index + 1 ? '' : 'text-[hsl(var(--muted-foreground))]'}`}>{label}</span>{index < 2 && <span className="mx-1 h-px w-5 bg-[hsl(var(--border))]" />}</div>)}</div></div>
       <div className="grid gap-10 lg:grid-cols-[1fr_390px] lg:items-start">
         <div className="space-y-8">
           <section className="border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-8" data-testid="section-travel-details"><div className="mb-7 flex items-start justify-between"><div><span className="mono-label text-[hsl(var(--accent-foreground))]">01 / Travel details</span><h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Tell us where you're going.</h2></div><ShieldCheck size={22} className="text-[hsl(var(--accent-foreground))]" /></div><div className="grid gap-5 sm:grid-cols-2"><label className="text-xs font-bold">Destination<select value={destination} onChange={(event) => setDestination(event.target.value)} className="mt-2 w-full border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-3.5 text-sm outline-none focus:border-[hsl(var(--primary))]" data-testid="select-destination"><option>Japan</option><option>United States</option><option>United Kingdom</option><option>Singapore</option><option>Australia</option><option>France</option></select></label><label className="text-xs font-bold">Departure time<input value={flightTime} onChange={(event) => setFlightTime(event.target.value)} className="mt-2 w-full border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-3.5 text-sm outline-none focus:border-[hsl(var(--primary))]" data-testid="input-flight-time" /></label><label className="text-xs font-bold sm:col-span-2">Flight number<input required value={flightNumber} onChange={(event) => setFlightNumber(event.target.value)} placeholder="e.g. NH 212" className="mt-2 w-full border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-3.5 text-sm uppercase outline-none focus:border-[hsl(var(--primary))] placeholder:normal-case placeholder:text-[hsl(var(--muted-foreground))]" data-testid="input-flight-number" /></label></div>{quote && <div className={`mt-6 flex items-start gap-3 border px-4 py-3 text-xs leading-relaxed ${quote.eligible ? 'border-[hsl(var(--secondary))] bg-[hsl(var(--secondary)/.12)]' : 'border-[hsl(var(--destructive)/.35)] bg-[hsl(var(--destructive)/.08)]'}`} data-testid="status-eligibility"><ShieldCheck size={16} className="mt-0.5 shrink-0" /><span>{quote.message}</span></div>}</section>
            <section className="border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-8" data-testid="section-rfid-scan"><div className="mb-6 flex items-start justify-between"><div><span className="mono-label text-[hsl(var(--accent-foreground))]">02 / Item verification</span><h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Scan your tagged pieces.</h2><p className="mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">Place each item on the reader. We'll confirm it is in your basket before payment.</p></div><Radio size={25} className="text-[hsl(var(--accent-foreground))]" /></div><div className="relative overflow-hidden border border-dashed border-[hsl(var(--accent-foreground)/.6)] bg-[hsl(var(--muted)/.55)] p-5"><div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-[hsl(var(--accent-foreground))] scanline" /><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.13em] text-[hsl(var(--muted-foreground))]">{readerConnected ? <><span className="h-2 w-2 rounded-full bg-[hsl(var(--secondary-foreground))]" /> Reader connected</> : 'Manual entry or hardware reader'}</span><button type="button" onClick={connectReader} disabled={readerBusy} className="flex items-center gap-2 border border-[hsl(var(--primary))] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[hsl(var(--primary))] disabled:opacity-50" data-testid="button-connect-reader"><Radio size={13} /> {readerBusy ? 'Listening...' : 'Connect reader'}</button></div><form onSubmit={scan} className="flex flex-col gap-3 sm:flex-row"><div className="flex flex-1 items-center border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3"><ScanLine size={16} className="mr-2 text-[hsl(var(--muted-foreground))]" /><input value={tagId} onChange={(event) => setTagId(event.target.value)} placeholder="Enter RFID tag ID" className="w-full bg-transparent py-3.5 text-sm outline-none" data-testid="input-rfid-tag" /></div><button type="submit" disabled={scanMutation.isPending} className="flex items-center justify-center gap-2 bg-[hsl(var(--primary))] px-5 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[hsl(var(--background))] disabled:opacity-60" data-testid="button-scan-rfid">{scanMutation.isPending ? 'Reading...' : <><ScanLine size={14} /> Scan item</>}</button></form>{scanMessage && <p className="mt-4 flex items-center gap-2 text-xs font-semibold" data-testid="status-rfid-result"><CheckCircle2 size={15} className={scannedTag ? 'text-[hsl(var(--secondary-foreground))]' : 'text-[hsl(var(--destructive))]'} /> {scanMessage}</p>}<p className="mt-4 flex items-center gap-2 text-[10px] text-[hsl(var(--muted-foreground))]"><Info size={13} /> Try a tag from the item's packaging.</p></div></section>
-          <section className="border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-8" data-testid="section-payment"><div className="mb-6 flex items-start justify-between"><div><span className="mono-label text-[hsl(var(--accent-foreground))]">03 / Payment-ready confirmation</span><h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Where should we send your receipt?</h2></div><CreditCard size={23} className="text-[hsl(var(--accent-foreground))]" /></div><div className="space-y-5"><label className="block text-xs font-bold">Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" className="mt-2 w-full border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-3.5 text-sm outline-none focus:border-[hsl(var(--primary))]" data-testid="input-email" /></label><div><p className="mb-2 text-xs font-bold">Payment method</p><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => setPaymentMethod('card')} className={`flex items-center justify-between border p-4 text-left text-xs font-bold ${paymentMethod === 'card' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--muted))]' : 'border-[hsl(var(--border))]'}`} data-testid="button-payment-card"><span className="flex items-center gap-2"><CreditCard size={16} /> Card at collection</span>{paymentMethod === 'card' && <Check size={15} />}</button><button type="button" onClick={() => setPaymentMethod('mobile-pay')} className={`flex items-center justify-between border p-4 text-left text-xs font-bold ${paymentMethod === 'mobile-pay' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--muted))]' : 'border-[hsl(var(--border))]'}`} data-testid="button-payment-mobile"><span className="flex items-center gap-2"><Radio size={16} /> Mobile pay</span>{paymentMethod === 'mobile-pay' && <Check size={15} />}</button></div></div></div></section>
+          <section className="border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-8" data-testid="section-payment"><div className="mb-6 flex items-start justify-between"><div><span className="mono-label text-[hsl(var(--accent-foreground))]">03 / Payment-ready confirmation</span><h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Where should we send your receipt?</h2></div><CreditCard size={23} className="text-[hsl(var(--accent-foreground))]" /></div><div className="space-y-5"><label className="block text-xs font-bold">Verified receipt email<input required readOnly type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" className="mt-2 w-full border border-[hsl(var(--input))] bg-[hsl(var(--muted)/.5)] px-3 py-3.5 text-sm outline-none focus:border-[hsl(var(--primary))]" data-testid="input-email" /></label><p className="flex items-start gap-2 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]"><ShieldCheck size={14} className="mt-0.5 shrink-0 text-[hsl(var(--secondary-foreground))]" /> Receipt details are tied to the verified account signed in above.</p><div><p className="mb-2 text-xs font-bold">Payment method</p><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => setPaymentMethod('card')} className={`flex items-center justify-between border p-4 text-left text-xs font-bold ${paymentMethod === 'card' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--muted))]' : 'border-[hsl(var(--border))]'}`} data-testid="button-payment-card"><span className="flex items-center gap-2"><CreditCard size={16} /> Card at collection</span>{paymentMethod === 'card' && <Check size={15} />}</button><button type="button" onClick={() => setPaymentMethod('mobile-pay')} className={`flex items-center justify-between border p-4 text-left text-xs font-bold ${paymentMethod === 'mobile-pay' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--muted))]' : 'border-[hsl(var(--border))]'}`} data-testid="button-payment-mobile"><span className="flex items-center gap-2"><Radio size={16} /> Mobile pay</span>{paymentMethod === 'mobile-pay' && <Check size={15} />}</button></div></div></div></section>
           <button type="button" onClick={() => complete({ preventDefault: () => undefined } as FormEvent)} disabled={checkoutMutation.isPending || !quote?.eligible || !flightNumber || !email} className="flex w-full items-center justify-center gap-3 bg-[hsl(var(--primary))] py-5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[hsl(var(--background))] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40" data-testid="button-complete-checkout">{checkoutMutation.isPending ? 'Preparing your collection...' : <>Confirm and reserve <ArrowRight size={16} /></>}</button>
           {checkoutMutation.isError && <p className="flex items-center gap-2 text-xs font-semibold text-[hsl(var(--destructive))]" data-testid="status-checkout-error"><CircleAlert size={15} /> We couldn't complete that just yet. Please check your details and try again.</p>}
         </div>
@@ -304,9 +436,12 @@ function CheckoutPage({ basket, onAdd, onRemove, onClear }: { basket: BasketLine
 function OrderPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { isLoaded, isSignedIn } = useAuth();
   const [order, setOrder] = useState<CheckoutResult | null>(null);
   useEffect(() => { try { setOrder(JSON.parse(localStorage.getItem('armani-last-order') ?? 'null') as CheckoutResult | null); } catch { setOrder(null); } }, []);
   const result = order?.orderId === id ? order : null;
+  if (!isLoaded) return <div className="armani-shell flex min-h-[100dvh] items-center justify-center"><p className="mono-label">Loading reservation…</p></div>;
+  if (!isSignedIn) return <AuthRequiredPage title="Sign in to view this reservation." />;
   return <div className="armani-shell min-h-[100dvh]"><Header count={0} onBasket={() => setLocation('/')} /><main className="mx-auto max-w-4xl px-5 py-16 sm:px-10 lg:py-24"><div className="border border-[hsl(var(--border))] bg-[hsl(var(--card))]"><div className="relative overflow-hidden bg-[hsl(var(--primary))] px-6 py-14 text-center text-[hsl(var(--background))] sm:px-12"><div className="absolute inset-0 opacity-20 quiet-grid" /><div className="relative"><div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--secondary))] text-[hsl(var(--primary))]"><Check size={30} /></div><p className="mono-label text-[hsl(var(--secondary))]">Collection reserved</p><h1 className="display-serif mt-4 text-5xl italic sm:text-7xl">You're all set.</h1><p className="mx-auto mt-5 max-w-md text-sm leading-7 text-[hsl(var(--background)/.7)]">{result?.message ?? 'Your Armani beauty selection is ready to meet you before departure.'}</p></div></div><div className="grid gap-8 p-6 sm:p-10 md:grid-cols-2"><div><p className="mono-label text-[hsl(var(--muted-foreground))]">Reservation number</p><p className="mt-2 font-mono text-xl font-medium tracking-[0.08em]" data-testid="text-order-id">{id}</p><div className="mt-7 grid grid-cols-2 gap-6"><div><p className="mono-label text-[hsl(var(--muted-foreground))]">Total</p><p className="mt-2 text-lg font-extrabold" data-testid="text-order-total">{money(result?.total ?? 0)}</p></div><div><p className="mono-label text-[hsl(var(--muted-foreground))]">Window</p><p className="mt-2 text-sm font-bold" data-testid="text-collection-window">{result?.collectionWindow ?? 'Before your boarding call'}</p></div></div></div><div className="border-l-0 border-[hsl(var(--border))] md:border-l md:pl-8"><p className="mono-label text-[hsl(var(--muted-foreground))]">Collection instructions</p><div className="mt-4 flex gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center bg-[hsl(var(--secondary))] text-[hsl(var(--primary))]"><MapPinIcon /></span><p className="text-sm leading-6"><strong className="block">{result?.collectionPoint ?? 'Terminal 2 · Collection desk'}</strong>Present this reservation number and your boarding pass after security.</p></div><div className="mt-5 flex gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center bg-[hsl(var(--muted))]"><Clock3 size={15} /></span><p className="text-sm leading-6">Allow a little time before boarding. Your pieces will be waiting, wrapped and ready.</p></div></div></div><div className="flex flex-col gap-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--muted)/.45)] p-6 sm:flex-row sm:justify-between sm:px-10"><Link href="/" className="flex items-center justify-center gap-2 border border-[hsl(var(--primary))] px-5 py-3 text-[10px] font-extrabold uppercase tracking-[0.15em]" data-testid="link-back-home">Back to collection</Link><button onClick={() => window.print()} className="flex items-center justify-center gap-2 bg-[hsl(var(--primary))] px-5 py-3 text-[10px] font-extrabold uppercase tracking-[0.15em] text-[hsl(var(--background))]" data-testid="button-print-order">Print details <ArrowRight size={14} /></button></div></div></main></div>;
 }
 
@@ -314,20 +449,45 @@ function MapPinIcon() {
   return <span className="relative block h-4 w-3 rounded-t-full border-2 border-[hsl(var(--primary))] after:absolute after:bottom-[-5px] after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rotate-45 after:border-b-2 after:border-r-2 after:border-[hsl(var(--primary))]" />;
 }
 
+function HomeRedirect({ onAdd, onBasket, count }: { onAdd: (product: Product) => void; onBasket: () => void; count: number }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return <div className="armani-shell flex min-h-[100dvh] items-center justify-center"><p className="mono-label">Preparing the collection…</p></div>;
+  return isSignedIn ? <Redirect to="/account" /> : <HomePage onAdd={onAdd} onBasket={onBasket} count={count} />;
+}
+
+function ClerkQueryClientCacheInvalidator() {
+  const { isLoaded, userId } = useAuth();
+  const previousUserId = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (previousUserId.current !== undefined && previousUserId.current !== userId) queryClient.clear();
+    previousUserId.current = userId;
+  }, [isLoaded, userId]);
+  return null;
+}
+
 function Router({ basket, onAdd, onAdjust, onRemove, onClear, onBasket }: { basket: BasketLine[]; onAdd: (product: Product) => void; onAdjust: (id: string, change: number) => void; onRemove: (id: string) => void; onClear: () => void; onBasket: () => void }) {
   const [location] = useLocation();
   return <ErrorBoundary resetKey={location}><Switch>
-    <Route path="/" component={() => <HomePage onAdd={onAdd} onBasket={onBasket} count={basket.reduce((sum, line) => sum + line.quantity, 0)} />} />
+    <Route path="/" component={() => <HomeRedirect onAdd={onAdd} onBasket={onBasket} count={basket.reduce((sum, line) => sum + line.quantity, 0)} />} />
+    <Route path="/sign-in/*?" component={SignInPage} />
+    <Route path="/sign-up/*?" component={SignUpPage} />
+    <Route path="/account" component={AccountPage} />
     <Route path="/checkout" component={() => <CheckoutPage basket={basket} onAdd={onAdd} onRemove={onRemove} onClear={onClear} />} />
     <Route path="/order/:id" component={OrderPage} />
     <Route component={NotFound} />
   </Switch></ErrorBoundary>;
 }
 
-function App() {
+function AuthenticatedApp() {
   const cart = usePersistedBasket();
   const [basketOpen, setBasketOpen] = useState(false);
-  return <QueryClientProvider client={queryClient}><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router basket={cart.basket} onAdd={cart.add} onAdjust={cart.adjust} onRemove={cart.remove} onClear={cart.clear} onBasket={() => setBasketOpen(true)} /></WouterRouter><BasketDrawer basket={cart.basket} open={basketOpen} onClose={() => setBasketOpen(false)} onAdjust={cart.adjust} onRemove={cart.remove} /></QueryClientProvider>;
+  const [, setLocation] = useLocation();
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to protect your reservations' } }, signUp: { start: { title: 'Create your account', subtitle: 'Verify your email for secure collection' } } }}><QueryClientProvider client={queryClient}><ClerkQueryClientCacheInvalidator /><Router basket={cart.basket} onAdd={cart.add} onAdjust={cart.adjust} onRemove={cart.remove} onClear={cart.clear} onBasket={() => setBasketOpen(true)} /><BasketDrawer basket={cart.basket} open={basketOpen} onClose={() => setBasketOpen(false)} onAdjust={cart.adjust} onRemove={cart.remove} /></QueryClientProvider></ClerkProvider>;
+}
+
+function App() {
+  return <WouterRouter base={basePath}><AuthenticatedApp /></WouterRouter>;
 }
 
 export default App;

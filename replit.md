@@ -10,6 +10,7 @@ An elevated airport duty-free storefront with RFID-assisted self-checkout, trave
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
+- Auth env: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and `VITE_CLERK_PUBLISHABLE_KEY` — provisioned by Replit-managed Clerk
 
 ## Stack
 
@@ -35,6 +36,8 @@ An elevated airport duty-free storefront with RFID-assisted self-checkout, trave
 - Basket state is persisted locally for a fast airport-terminal flow; checkout returns a reservation for gate collection.
 - RFID supports Web Serial readers when available and manual tag entry as a browser-safe fallback.
 - GraphQL is exposed at `/api/graphql` for catalog and store-status queries alongside the generated REST surface.
+- Clerk handles registration, email verification, sign-in, and session identity. Protected checkout/account APIs derive ownership from the authenticated Clerk user ID; the browser never submits a customer ID as proof of ownership.
+- `customer_accounts` stores store credit by Clerk user ID. Quotes apply available credit and checkout deducts it with a guarded atomic update.
 
 ## Product
 

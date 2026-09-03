@@ -15,5 +15,15 @@ export interface CartQuote {
   total: number;
   itemCount: number;
   eligible: boolean;
+  /**
+     * Whole cents available to the signed-in customer
+     * @minimum 0
+     */
+  storeCreditCents: number;
+  /**
+     * Whole cents applied to this quote
+     * @minimum 0
+     */
+  creditAppliedCents: number;
   message: string;
 }

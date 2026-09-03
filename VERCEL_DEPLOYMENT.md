@@ -12,9 +12,14 @@ Vercel project.
    - Install: `pnpm install --frozen-lockfile`
    - Build: `pnpm --filter @workspace/armani-duty-free run build`
    - Output: `artifacts/armani-duty-free/dist/public`
-5. Click **Deploy**.
+5. Add these environment variables in the Vercel project before deploying:
+   - `CLERK_PUBLISHABLE_KEY` — the server-side Clerk publishable key
+   - `CLERK_SECRET_KEY` — the server-side Clerk secret key
+   - `VITE_CLERK_PUBLISHABLE_KEY` — the same Clerk publishable key exposed to the Vite build
+   - `DATABASE_URL` — the PostgreSQL connection string used by the customer account table
+6. Click **Deploy**.
 
-No environment variables are required for the demo version.
+Never commit these values to the repository or paste them into client-side code.
 
 ## Deploy with the Vercel CLI
 
@@ -33,6 +38,9 @@ pnpm dlx vercel --prod
 ## Routes after deployment
 
 - Storefront: `/`
+- Registration: `/sign-up`
+- Sign in: `/sign-in`
+- Customer account: `/account`
 - Checkout: `/checkout`
 - Order confirmation: `/order/:id`
 - REST API: `/api/catalog`, `/api/cart/quote`, `/api/rfid/scan`, `/api/checkout`
@@ -44,6 +52,11 @@ frontend URL changes are needed.
 
 ## Production notes
 
-The current catalog and order reservations are demo data held in server
-memory, while the basket is stored in the shopper's browser. Add a database
-and payment provider before using this as a live retail checkout.
+Customer authentication is handled by Clerk. The account table is keyed by
+the authenticated Clerk user ID, so a typed customer ID can never unlock
+another customer's store credit. Quotes apply available credit, and checkout
+deducts it with an atomic balance guard.
+
+The catalog and reservation response are still demo data held in server
+memory, while the basket is stored in the shopper's browser. Add a durable
+orders table and payment provider before using this as a live retail checkout.

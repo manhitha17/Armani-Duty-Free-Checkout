@@ -12,6 +12,7 @@ export * from './cartQuote';
 export * from './cartQuoteInput';
 export * from './checkoutInput';
 export * from './checkoutResult';
+export * from './customerAccount';
 export * from './graphqlInput';
 export * from './graphqlInputVariables';
 export * from './graphqlResponse';

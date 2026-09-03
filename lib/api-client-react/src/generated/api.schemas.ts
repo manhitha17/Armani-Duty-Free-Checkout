@@ -49,6 +49,16 @@ export interface CartQuote {
   total: number;
   itemCount: number;
   eligible: boolean;
+  /**
+     * Whole cents available to the signed-in customer
+     * @minimum 0
+     */
+  storeCreditCents: number;
+  /**
+     * Whole cents applied to this quote
+     * @minimum 0
+     */
+  creditAppliedCents: number;
   message: string;
 }
 
@@ -86,6 +96,15 @@ export interface StoreStatus {
   terminal: string;
   collectionPoint: string;
   nextFlight: string;
+}
+
+export interface CustomerAccount {
+  userId: string;
+  /**
+     * Whole cents
+     * @minimum 0
+     */
+  storeCreditCents: number;
 }
 
 export type GraphqlInputVariables = { [key: string]: unknown };

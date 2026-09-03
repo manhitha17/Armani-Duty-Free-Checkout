@@ -24,6 +24,7 @@ import type {
   CartQuoteInput,
   CheckoutInput,
   CheckoutResult,
+  CustomerAccount,
   GraphqlInput,
   GraphqlResponse,
   HealthStatus,
@@ -326,7 +327,7 @@ export const quoteCart = async (cartQuoteInput: CartQuoteInput, options?: Parame
 
 
 
-export const getQuoteCartMutationOptions = <TError = ErrorType<unknown>,
+export const getQuoteCartMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof quoteCart>>, TError,{data: BodyType<CartQuoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof quoteCart>>, TError,{data: BodyType<CartQuoteInput>}, TContext> => {
 
@@ -355,12 +356,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type QuoteCartMutationResult = NonNullable<Awaited<ReturnType<typeof quoteCart>>>
     export type QuoteCartMutationBody = BodyType<CartQuoteInput>
-    export type QuoteCartMutationError = ErrorType<unknown>
+    export type QuoteCartMutationError = ErrorType<void>
 
     /**
  * @summary Calculate a duty-free basket quote
  */
-export const useQuoteCart = <TError = ErrorType<unknown>,
+export const useQuoteCart = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof quoteCart>>, TError,{data: BodyType<CartQuoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof quoteCart>>,
@@ -397,7 +398,7 @@ export const scanRfid = async (rfidScanInput: RfidScanInput, options?: Parameter
 
 
 
-export const getScanRfidMutationOptions = <TError = ErrorType<unknown>,
+export const getScanRfidMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanRfid>>, TError,{data: BodyType<RfidScanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof scanRfid>>, TError,{data: BodyType<RfidScanInput>}, TContext> => {
 
@@ -426,12 +427,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ScanRfidMutationResult = NonNullable<Awaited<ReturnType<typeof scanRfid>>>
     export type ScanRfidMutationBody = BodyType<RfidScanInput>
-    export type ScanRfidMutationError = ErrorType<unknown>
+    export type ScanRfidMutationError = ErrorType<void>
 
     /**
  * @summary Resolve an RFID tag into a product
  */
-export const useScanRfid = <TError = ErrorType<unknown>,
+export const useScanRfid = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanRfid>>, TError,{data: BodyType<RfidScanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof scanRfid>>,
@@ -468,7 +469,7 @@ export const completeCheckout = async (checkoutInput: CheckoutInput, options?: P
 
 
 
-export const getCompleteCheckoutMutationOptions = <TError = ErrorType<unknown>,
+export const getCompleteCheckoutMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeCheckout>>, TError,{data: BodyType<CheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof completeCheckout>>, TError,{data: BodyType<CheckoutInput>}, TContext> => {
 
@@ -497,12 +498,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CompleteCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof completeCheckout>>>
     export type CompleteCheckoutMutationBody = BodyType<CheckoutInput>
-    export type CompleteCheckoutMutationError = ErrorType<unknown>
+    export type CompleteCheckoutMutationError = ErrorType<void>
 
     /**
  * @summary Complete a self-checkout purchase
  */
-export const useCompleteCheckout = <TError = ErrorType<unknown>,
+export const useCompleteCheckout = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeCheckout>>, TError,{data: BodyType<CheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof completeCheckout>>,
@@ -578,6 +579,83 @@ export function useGetStoreStatus<TData = Awaited<ReturnType<typeof getStoreStat
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStoreStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCustomerAccountUrl = () => {
+
+
+
+
+  return `/api/account`
+}
+
+/**
+ * @summary Get the signed-in customer's account
+ */
+export const getCustomerAccount = async ( options?: Parameters<typeof customFetch>[1]): Promise<CustomerAccount> => {
+
+  return customFetch<CustomerAccount>(getGetCustomerAccountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCustomerAccountQueryKey = () => {
+    return [
+    `/api/account`
+    ] as const;
+    }
+
+
+export const getGetCustomerAccountQueryOptions = <TData = Awaited<ReturnType<typeof getCustomerAccount>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCustomerAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCustomerAccountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCustomerAccount>>> = ({ signal }) => getCustomerAccount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCustomerAccount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCustomerAccountQueryResult = NonNullable<Awaited<ReturnType<typeof getCustomerAccount>>>
+export type GetCustomerAccountQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the signed-in customer's account
+ */
+
+export function useGetCustomerAccount<TData = Awaited<ReturnType<typeof getCustomerAccount>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCustomerAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCustomerAccountQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

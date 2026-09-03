@@ -12,6 +12,9 @@ import {
   ScanRfidResponse,
 } from "@workspace/api-zod";
 import { catalog, findProduct, findProductByTag, storeStatus } from "../data/catalog";
+import { requireCustomer } from "../middlewares/requireCustomer";
+import { db, customerAccountsTable } from "@workspace/db";
+import { and, eq, gte, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -62,7 +65,7 @@ router.get("/catalog/featured", (_req, res) => {
   );
 });
 
-router.post("/cart/quote", (req, res) => {
+router.post("/cart/quote", requireCustomer, async (req, res) => {
   const input = QuoteCartBody.parse(req.body);
   const items = quoteItems(input.items);
   const subtotal = Number(
@@ -75,7 +78,13 @@ router.post("/cart/quote", (req, res) => {
   const savings = Number(Math.max(compareTotal - subtotal, 0).toFixed(2));
   const duties = 0;
   const eligible = Boolean(input.destination && input.flightTime);
-  const total = Number((subtotal + duties).toFixed(2));
+  const [account] = req.customerId
+    ? await db.select().from(customerAccountsTable).where(eq(customerAccountsTable.clerkUserId, req.customerId)).limit(1)
+    : [];
+  const storeCreditCents = account?.storeCreditCents ?? 0;
+  const subtotalCents = Math.round((subtotal + duties) * 100);
+  const creditAppliedCents = Math.min(storeCreditCents, subtotalCents);
+  const total = Number(((subtotalCents - creditAppliedCents) / 100).toFixed(2));
   res.json(
     QuoteCartResponse.parse({
       items,
@@ -85,6 +94,8 @@ router.post("/cart/quote", (req, res) => {
       total,
       itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
       eligible,
+       storeCreditCents,
+       creditAppliedCents,
       message: eligible
         ? "You're all set for collection before boarding."
         : "Add your destination and flight time to confirm collection.",
@@ -92,7 +103,7 @@ router.post("/cart/quote", (req, res) => {
   );
 });
 
-router.post("/rfid/scan", (req, res) => {
+router.post("/rfid/scan", requireCustomer, (req, res) => {
   const input = ScanRfidBody.parse(req.body);
   const product = findProductByTag(input.tagId) ?? null;
   res.json(
@@ -107,12 +118,51 @@ router.post("/rfid/scan", (req, res) => {
   );
 });
 
-router.post("/checkout", (req, res) => {
+router.post("/checkout", requireCustomer, async (req, res) => {
   const input = CompleteCheckoutBody.parse(req.body);
+  if (req.customerEmail && input.email.trim().toLowerCase() !== req.customerEmail.trim().toLowerCase()) {
+    res.status(400).json({
+      error: "Receipt email must match the signed-in account",
+      message: "Use the verified email address on your Armani account.",
+    });
+    return;
+  }
   const items = quoteItems(input.items);
-  const total = Number(
-    items.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2),
-  );
+  const subtotal = Number(items.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2));
+  const subtotalCents = Math.round(subtotal * 100);
+  let storeCreditCents = 0;
+  if (req.customerId) {
+    const [account] = await db
+      .select()
+      .from(customerAccountsTable)
+      .where(eq(customerAccountsTable.clerkUserId, req.customerId))
+      .limit(1);
+    storeCreditCents = account?.storeCreditCents ?? 0;
+    const creditAppliedCents = Math.min(storeCreditCents, subtotalCents);
+    if (creditAppliedCents > 0) {
+      const [updated] = await db
+        .update(customerAccountsTable)
+        .set({
+          storeCreditCents: sql`${customerAccountsTable.storeCreditCents} - ${creditAppliedCents}`,
+        })
+        .where(and(
+          eq(customerAccountsTable.clerkUserId, req.customerId),
+          gte(customerAccountsTable.storeCreditCents, creditAppliedCents),
+        ))
+        .returning({ storeCreditCents: customerAccountsTable.storeCreditCents });
+      if (!updated) {
+        res.status(409).json({
+          error: "Store credit changed",
+          message: "Your store credit changed in another session. Refresh and try again.",
+        });
+        return;
+      }
+      storeCreditCents = creditAppliedCents;
+    } else {
+      storeCreditCents = 0;
+    }
+  }
+  const total = Number(((subtotalCents - storeCreditCents) / 100).toFixed(2));
   const orderId = `ARM-${Date.now().toString(36).toUpperCase().slice(-6)}`;
   const result = {
     orderId,

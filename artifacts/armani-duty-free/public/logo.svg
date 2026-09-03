@@ -1,0 +1,9 @@
+<svg width="160" height="48" viewBox="0 0 160 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="46" height="46" stroke="#123D3A" stroke-width="2"/>
+  <path d="M24 10L36 37H31.5L28.5 30H19.5L16.5 37H12L24 10ZM21 26H27L24 18.8L21 26Z" fill="#123D3A"/>
+  <path d="M59 14H63.5L69 28.5L74.5 14H79V34H75.5V19.5L70 34H67.5L62 19.5V34H59V14Z" fill="#123D3A"/>
+  <path d="M83 14H87V34H83V14ZM82.5 9.5H87.5V12.5H82.5V9.5Z" fill="#123D3A"/>
+  <path d="M91 14H95V17.5C96.4 15 98.5 13.5 101.5 13.5C105.4 13.5 107.5 16.1 107.5 20.5V34H103.5V21.5C103.5 18.8 102.4 17 99.8 17C96.8 17 95 19.4 95 22.4V34H91V14Z" fill="#123D3A"/>
+  <path d="M112 14H116L121.5 28.5L127 14H131.5V34H128V19.5L122.5 34H120L114.5 19.5V34H112V14Z" fill="#123D3A"/>
+  <text x="59" y="43" fill="#6F7D78" font-family="Arial, sans-serif" font-size="6" letter-spacing="2.2">DUTY FREE</text>
+</svg>
