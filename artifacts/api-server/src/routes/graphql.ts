@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { catalog, findProduct, storeStatus } from "../data/catalog";
+import { catalog, findProduct, storeStatus } from "../data/catalog.js";
 
 const router: IRouter = Router();
 

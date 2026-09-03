@@ -11,8 +11,8 @@ import {
   ScanRfidBody,
   ScanRfidResponse,
 } from "@workspace/api-zod";
-import { catalog, findProduct, findProductByTag, storeStatus } from "../data/catalog";
-import { requireCustomer } from "../middlewares/requireCustomer";
+import { catalog, findProduct, findProductByTag, storeStatus } from "../data/catalog.js";
+import { requireCustomer } from "../middlewares/requireCustomer.js";
 import { db, customerAccountsTable } from "@workspace/db";
 import { and, eq, gte, sql } from "drizzle-orm";
 

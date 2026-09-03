@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
-import storefrontRouter from "./storefront";
-import graphqlRouter from "./graphql";
-import { requireCustomer } from "../middlewares/requireCustomer";
+import healthRouter from "./health.js";
+import storefrontRouter from "./storefront.js";
+import graphqlRouter from "./graphql.js";
+import { requireCustomer } from "../middlewares/requireCustomer.js";
 import { db, customerAccountsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { GetCustomerAccountResponse } from "@workspace/api-zod";
