@@ -43,7 +43,7 @@ import {
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import NotFound from '@/pages/not-found';
-import { Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter, Link } from 'wouter';
+import { Route, Switch, useLocation, useParams, Router as WouterRouter, Link } from 'wouter';
 
 const queryClient = new QueryClient();
 const money = (value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -450,9 +450,7 @@ function MapPinIcon() {
 }
 
 function HomeRedirect({ onAdd, onBasket, count }: { onAdd: (product: Product) => void; onBasket: () => void; count: number }) {
-  const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return <div className="armani-shell flex min-h-[100dvh] items-center justify-center"><p className="mono-label">Preparing the collection…</p></div>;
-  return isSignedIn ? <Redirect to="/account" /> : <HomePage onAdd={onAdd} onBasket={onBasket} count={count} />;
+  return <HomePage onAdd={onAdd} onBasket={onBasket} count={count} />;
 }
 
 function ClerkQueryClientCacheInvalidator() {
