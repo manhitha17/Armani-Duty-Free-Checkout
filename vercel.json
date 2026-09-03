@@ -2,7 +2,7 @@
   "version": 2,
   "framework": "vite",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @workspace/armani-duty-free run build",
+  "buildCommand": "node artifacts/api-server/build-vercel.mjs && pnpm --filter @workspace/armani-duty-free run build",
   "outputDirectory": "artifacts/armani-duty-free/dist/public",
   "rewrites": [
     {
