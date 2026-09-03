@@ -1,4 +1,4 @@
-import express, { type Request } from "express";
+import express from "express";
 import cors from "cors";
 import { pinoHttp } from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -37,7 +37,7 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
-  clerkMiddleware((req: Request) => ({
+  clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
       getClerkProxyHost(req) ?? "",
       process.env.CLERK_PUBLISHABLE_KEY,
